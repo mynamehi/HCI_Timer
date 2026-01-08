@@ -1,6 +1,23 @@
+## 使用言語:
+Java(Javafx)  
+最新バージョンを利用している
 
-## HCIアプリ　成果物
+## プロジェクトの概要
+### プロジェクト名
+HCI Timer アプリ  
 
+### 概要
+大学での講義HCIの最終課題
+ポモドーロ法でGUIが優れているタイマーを作成しようと思いタイマーアプリを作成した。
+
+### 環境構築
+以下のサイトの環境を構築し作成している。  
+https://www.fit.ac.jp/~m-ishihara/Lectures/R04/HCIProgramming/howToInstallJavaFX/howToInstallJavaFX.html
+
+### ディレクトリ
+特にとくちょうなし
+
+# コードを書く上での仕様書
 
 
 ## sceneの種類
@@ -13,7 +30,7 @@
 3. DrawingScene   
 コップを制作するページ
 
-4. CupsScene
+4. CupsScene  
 作成したコップを選ぶことができる
 
 
