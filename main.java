@@ -17,6 +17,37 @@ import javafx.geometry.*;
 import javafx.collections.*;
 import javafx.animation.*;
 
+/* #シーンの基底クラス
+
+#機能
+全シーンに必要最低限必要な機能を搭載している
+
+#概要
+UI部品の構成
+scene
+ | = borderPane
+     |
+     |=top=menu
+     |     |=mb
+     |        |=mi
+     |        |=mi1
+     |        |=mi2
+     |        |=mi3
+     |
+     |=center=root
+               |...
+
+メゾッド
+-コンストラクタ
+インスタンス化およびUIノードの関係の構築
+-getScene[戻り値:Scene]
+sceneの返却
+-setHandler[引数:EventHandler ...]
+配列もしくは変数で受け取り、ハンドラが必要な変数にaddするため
+-createMenuBar[戻り値:MenuBar]
+メニューを作る。
+
+ */
 class BaseScene {
 
     protected BorderPane borderPane;
@@ -50,7 +81,7 @@ class BaseScene {
 
     }
 
-    protected MenuBar createMenuBar() {
+    private MenuBar createMenuBar() {
         mb = new MenuBar();
         menu = new Menu("設定");
         mi = new MenuItem("ホーム");
@@ -231,62 +262,88 @@ class SettingScene extends BaseScene {
     }
 }
 
+enum DOT_STATUS {
+    DRAW,
+    ERASER,
+    WATER,
+    EMPTY,
+}
+
 class MakeCupScene extends BaseScene {
 
     private HBox buttons = new HBox();
     private Button makeShape;
     private Button makeWater;
     private Button finish;
+    private Button eraser;
+    private final int dot_size = 20;
+    private final int dot_len = 20;
 
     private Pane drawPane;
+    private DOT_STATUS mode = DOT_STATUS.DRAW;
+    private Color modeColor = Color.BLACK;
 
-    boolean[][] dots = new boolean[32][32];
-    Rectangle[][] rects = new Rectangle[32][32];
-    boolean drawMode = true; // true: 描く / false: 消す
+    DOT_STATUS[][] dots = new DOT_STATUS[dot_len][dot_len];
+    Rectangle[][] rects = new Rectangle[dot_len][dot_len];
 
     public MakeCupScene() {
-        makeShape = new Button("Shape");
+        makeShape = new Button("Draw");
         makeWater = new Button("Water");
         finish = new Button("Finish");
-        buttons.getChildren().addAll(makeShape, makeWater, finish);
+        eraser = new Button("eraser");
+        buttons.getChildren().addAll(makeShape, eraser, makeWater, finish);
+
+        makeShape.setOnMouseClicked(e -> {
+            mode = DOT_STATUS.DRAW;
+            modeColor = Color.BLACK;
+            System.out.println(mode.name());
+        });
+
+        makeWater.setOnMouseClicked(e -> {
+            mode = DOT_STATUS.WATER;
+            modeColor = Color.AQUA;
+            System.out.println(mode.name());
+        });
+
+        eraser.setOnMouseClicked(e -> {
+            mode = DOT_STATUS.EMPTY;
+            modeColor = Color.WHITE;
+            System.out.println(mode.name());
+        });
 
         drawPane = new Pane();
-        drawPane.setPrefSize(16 * 20, 16 * 20);
-        for (int y = 0; y < 16; y++) {
-            for (int x = 0; x < 16; x++) {
-                Rectangle r = new Rectangle(
-                        x * 20,
-                        y * 20,
-                        20,
-                        20);
-                r.setFill(Color.WHITE);
-                r.setStroke(Color.LIGHTGRAY); // グリッド線（不要なら消す）
+        drawPane.setPrefSize(dot_size * dot_len, dot_size * dot_size);
 
-                final int fx = x;
-                final int fy = y;
-
-                r.setOnMousePressed(e -> {
-                    drawMode = !dots[fx][fy]; // 描く or 消すを決定
-                    dots[fx][fy] = drawMode;
-                    r.setFill(drawMode ? Color.BLACK : Color.WHITE);
-                });
-
-                
-
-                r.setOnMouseEntered(e -> {
-                    // マウスボタンが押されたまま入ってきたか？
-                    if (e.isPrimaryButtonDown()) {
-                        if (dots[fx][fy] != drawMode) {
-                            dots[fx][fy] = drawMode;
-                            r.setFill(drawMode ? Color.BLACK : Color.WHITE);
-                        }
-                    }
-                });
-
-                rects[fx][fy] = r;
-                drawPane.getChildren().add(r);
+        for (int y = 0; y < dot_len; y++) {
+            for (int x = 0; x < dot_len; x++) {
+                rects[y][x] = new Rectangle(x * dot_size, y * dot_size, dot_size, dot_size);
+                drawPane.getChildren().add(rects[y][x]);
+                dots[y][x] = DOT_STATUS.EMPTY;
+                rects[y][x].setFill(Color.WHITE);
+                rects[y][x].setStroke(Color.GRAY);
             }
         }
+
+        drawPane.setOnMouseClicked(e -> {
+            double x = e.getX();
+            double y = e.getY();
+
+            int dx = (int) (x / dot_size);
+            int dy = (int) (y / dot_size);
+            dots[dy][dx] = mode;
+            rects[dy][dx].setFill(modeColor);
+        });
+
+        drawPane.setOnMouseDragged((e -> {
+            double x = e.getX();
+            double y = e.getY();
+
+            int dx = (int) (x / dot_size);
+            int dy = (int) (y / dot_size);
+            dots[dy][dx] = mode;
+            rects[dy][dx].setFill(modeColor);
+
+        }));
 
         root.getChildren().addAll(buttons);
         root.getChildren().addAll(drawPane);
