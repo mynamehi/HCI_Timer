@@ -15,6 +15,9 @@ import javafx.util.Duration;
 import javafx.event.*;
 import javafx.geometry.*;
 import javafx.collections.*;
+
+import java.io.*;
+
 import javafx.animation.*;
 
 /* #シーンの基底クラス
@@ -283,8 +286,8 @@ class MakeCupScene extends BaseScene {
     private DOT_STATUS mode = DOT_STATUS.DRAW;
     private Color modeColor = Color.BLACK;
 
-    DOT_STATUS[][] dots = new DOT_STATUS[dot_len][dot_len];
-    Rectangle[][] rects = new Rectangle[dot_len][dot_len];
+    private DOT_STATUS[][] dots = new DOT_STATUS[dot_len][dot_len];
+    private Rectangle[][] rects = new Rectangle[dot_len][dot_len];
 
     public MakeCupScene() {
         makeShape = new Button("Draw");
@@ -309,6 +312,13 @@ class MakeCupScene extends BaseScene {
             mode = DOT_STATUS.EMPTY;
             modeColor = Color.WHITE;
             System.out.println(mode.name());
+        });
+
+        finish.setOnMouseClicked(e->{
+            ConfirmationWindow();
+
+            System.out.println("finsh");
+
         });
 
         drawPane = new Pane();
@@ -352,6 +362,63 @@ class MakeCupScene extends BaseScene {
     @Override
     public void setHandler(EventHandler<Event>... event) {
         menu.addEventHandler(ActionEvent.ANY, event[0]);
+    }
+
+
+    private void ConfirmationWindow()
+    {
+
+        VBox vBox=new VBox();
+        HBox btnAndtf=new HBox();
+        TextField textField=new TextField();
+        Button btn=new Button("決定");
+        btnAndtf.getChildren().addAll(textField,btn);
+        Pane p=new Pane();
+       //p.setPrefSize(10,10);
+        Rectangle[][] show_rec=new Rectangle[dot_len][dot_len];
+        for(int y=0;y<dot_len;y++){
+            for(int x=0;x<dot_len;x++){
+                show_rec[y][x]=new Rectangle(10,10,10,10);
+                show_rec[y][x].setFill(rects[y][x].getFill());
+                show_rec[y][x].setX(x*10);
+                show_rec[y][x].setY(y*10);
+                p.getChildren().add(show_rec[y][x]);
+
+            }
+        }
+       
+
+        vBox.getChildren().add(btnAndtf);
+        vBox.getChildren().add(p);
+
+
+        
+
+
+
+
+        Scene scene=new Scene(vBox,200,200);
+        Stage stage=new Stage();
+        stage.setTitle("コップの命名");
+        stage.setScene(scene);
+        stage.show();
+
+
+        btn.setOnMouseClicked(e->{
+            try{
+                FileWriter file=new FileWriter("./cup_design.txt",true);
+                PrintWriter pw=new PrintWriter(new BufferedWriter(file));
+    
+                pw.print(rects);
+                
+                pw.close();
+    
+                
+            }catch(IOException e){
+                
+            }
+            stage.close();
+        });
     }
 }
 
