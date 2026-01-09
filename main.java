@@ -63,6 +63,7 @@ class BaseScene {
     protected MenuItem mi1;
     protected MenuItem mi2;
     protected MenuItem mi3;
+    protected MenuItem mi4;
 
     public BaseScene() {
 
@@ -90,14 +91,16 @@ class BaseScene {
         mi = new MenuItem("ホーム");
         mi1 = new MenuItem("タイマー設定");
         mi2 = new MenuItem("コップ作成");
-        mi3 = new MenuItem("終了");
+        mi3 = new MenuItem("コップ選択");
+        mi4 = new MenuItem("終了");
 
         mi.setId("home");
         mi1.setId("setting");
         mi2.setId("makeCup");
-        mi3.setId("exit");
+        mi3.setId("selectCup");
+        mi4.setId("exit");
 
-        menu.getItems().addAll(mi, mi1, mi2, mi3);
+        menu.getItems().addAll(mi, mi1, mi2, mi3,mi4);
         mb.getMenus().addAll(menu);
         return mb;
     }
@@ -406,20 +409,31 @@ class MakeCupScene extends BaseScene {
 
         btn.setOnMouseClicked(e->{
             try{
-                FileWriter file=new FileWriter("./cup_design.txt",true);
+                FileWriter file=new FileWriter("./cups.txt",true);
                 PrintWriter pw=new PrintWriter(new BufferedWriter(file));
+                pw.print(textField.getText()+" ");
     
-                pw.print(rects);
+                for(int y=0;y<dot_len;y++){
+                    for(int x=0;x<dot_len;x++){
+                        pw.print(dots[y][x].name()+",");
+
+                    }
+                }
                 
                 pw.close();
     
                 
-            }catch(IOException e){
+            }catch(IOException ee){
                 
             }
             stage.close();
         });
     }
+}
+
+class SelectScene extends BaseScene{
+
+    
 }
 
 public class main extends Application {
@@ -491,6 +505,10 @@ public class main extends Application {
                 makeCupScene.setHandler(menuEventHandler);
 
                 baseStage.setScene(makeCupScene.getScene());
+            }
+
+            if(id.equals("selectCup")){
+
             }
         }
     }
