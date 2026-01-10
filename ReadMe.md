@@ -69,7 +69,17 @@ https://www.fit.ac.jp/~m-ishihara/Lectures/R04/HCIProgramming/howToInstallJavaFX
 
 ## CupsScene
 コップを一覧で見ることができる
+現在、選択しているコップの名前を一番上に表示
+
 閲覧できる情報は
 - 作った日
-- タイトル
+- なまえ
 機能は削除とセット
+
+作成日:
+名前:
+_____________
+|           |    button:選択
+|           |
+|           |    button:削除
+_____________

@@ -1,3 +1,7 @@
+import java.sql.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 
 import javafx.application.*;
 import javafx.scene.*;
@@ -51,6 +55,24 @@ sceneの返却
 メニューを作る。
 
  */
+
+//グローバル変数
+class GV {
+
+    // 全シーン共通のサイズ
+    public static final int sceneW = 400;
+    public static final int sceneH = 450;
+
+    // コップ作成でのドットのサイズと配列の長さ
+    public static final int dot_size = 20;
+    public static final int dot_len = 20;
+
+    // タイマーの設定
+    public static int totalSeconds;// 勉強時間
+    public static int breakSeconds;// 休憩時間
+
+}
+
 class BaseScene {
 
     protected BorderPane borderPane;
@@ -72,7 +94,7 @@ class BaseScene {
 
         borderPane.setTop(createMenuBar());
         borderPane.setCenter(root);
-        scene = new Scene(borderPane, 400, 500);
+        scene = new Scene(borderPane, GV.sceneW, GV.sceneH);
 
     }
 
@@ -100,7 +122,7 @@ class BaseScene {
         mi3.setId("selectCup");
         mi4.setId("exit");
 
-        menu.getItems().addAll(mi, mi1, mi2, mi3,mi4);
+        menu.getItems().addAll(mi, mi1, mi2, mi3, mi4);
         mb.getMenus().addAll(menu);
         return mb;
     }
@@ -125,10 +147,10 @@ class TimerScene extends BaseScene {
 
     BtnState btnState;
 
-    private int totalSeconds = 20;// 勉強時間25分
-    private int breakSeconds = 10;// 休憩時間5分
-
     public TimerScene() {
+
+        GV.totalSeconds = 10;
+        GV.breakSeconds = 5;
 
         btnState = BtnState.STOP;
 
@@ -185,10 +207,10 @@ class TimerScene extends BaseScene {
         int hoge = 0;
 
         if (btnState == BtnState.START) {
-            hoge = totalSeconds - n;
+            hoge = GV.totalSeconds - n;
 
         } else if (btnState == BtnState.BREAK) {
-            hoge = breakSeconds - n;
+            hoge = GV.breakSeconds - n;
         }
 
         int m = hoge / 60;
@@ -270,7 +292,6 @@ class SettingScene extends BaseScene {
 
 enum DOT_STATUS {
     DRAW,
-    ERASER,
     WATER,
     EMPTY,
 }
@@ -282,15 +303,13 @@ class MakeCupScene extends BaseScene {
     private Button makeWater;
     private Button finish;
     private Button eraser;
-    private final int dot_size = 20;
-    private final int dot_len = 20;
 
     private Pane drawPane;
     private DOT_STATUS mode = DOT_STATUS.DRAW;
     private Color modeColor = Color.BLACK;
 
-    private DOT_STATUS[][] dots = new DOT_STATUS[dot_len][dot_len];
-    private Rectangle[][] rects = new Rectangle[dot_len][dot_len];
+    private DOT_STATUS[][] dots = new DOT_STATUS[GV.dot_len][GV.dot_len];
+    private Rectangle[][] rects = new Rectangle[GV.dot_len][GV.dot_len];
 
     public MakeCupScene() {
         makeShape = new Button("Draw");
@@ -317,19 +336,19 @@ class MakeCupScene extends BaseScene {
             System.out.println(mode.name());
         });
 
-        finish.setOnMouseClicked(e->{
+        finish.setOnMouseClicked(e -> {
             ConfirmationWindow();
 
-            System.out.println("finsh");
+            System.out.println("finish");
 
         });
 
         drawPane = new Pane();
-        drawPane.setPrefSize(dot_size * dot_len, dot_size * dot_size);
+        drawPane.setPrefSize(GV.dot_size * GV.dot_len, GV.dot_size * GV.dot_size);
 
-        for (int y = 0; y < dot_len; y++) {
-            for (int x = 0; x < dot_len; x++) {
-                rects[y][x] = new Rectangle(x * dot_size, y * dot_size, dot_size, dot_size);
+        for (int y = 0; y < GV.dot_len; y++) {
+            for (int x = 0; x < GV.dot_len; x++) {
+                rects[y][x] = new Rectangle(x * GV.dot_size, y * GV.dot_size, GV.dot_size, GV.dot_size);
                 drawPane.getChildren().add(rects[y][x]);
                 dots[y][x] = DOT_STATUS.EMPTY;
                 rects[y][x].setFill(Color.WHITE);
@@ -341,8 +360,8 @@ class MakeCupScene extends BaseScene {
             double x = e.getX();
             double y = e.getY();
 
-            int dx = (int) (x / dot_size);
-            int dy = (int) (y / dot_size);
+            int dx = (int) (x / GV.dot_size);
+            int dy = (int) (y / GV.dot_size);
             dots[dy][dx] = mode;
             rects[dy][dx].setFill(modeColor);
         });
@@ -351,8 +370,8 @@ class MakeCupScene extends BaseScene {
             double x = e.getX();
             double y = e.getY();
 
-            int dx = (int) (x / dot_size);
-            int dy = (int) (y / dot_size);
+            int dx = (int) (x / GV.dot_size);
+            int dy = (int) (y / GV.dot_size);
             dots[dy][dx] = mode;
             rects[dy][dx].setFill(modeColor);
 
@@ -367,73 +386,177 @@ class MakeCupScene extends BaseScene {
         menu.addEventHandler(ActionEvent.ANY, event[0]);
     }
 
+    private void ConfirmationWindow() {
 
-    private void ConfirmationWindow()
-    {
-
-        VBox vBox=new VBox();
-        HBox btnAndtf=new HBox();
-        TextField textField=new TextField();
-        Button btn=new Button("決定");
-        btnAndtf.getChildren().addAll(textField,btn);
-        Pane p=new Pane();
-       //p.setPrefSize(10,10);
-        Rectangle[][] show_rec=new Rectangle[dot_len][dot_len];
-        for(int y=0;y<dot_len;y++){
-            for(int x=0;x<dot_len;x++){
-                show_rec[y][x]=new Rectangle(10,10,10,10);
+        VBox vBox = new VBox();
+        HBox btnAndtf = new HBox();
+        TextField textField = new TextField();
+        Button btn = new Button("決定");
+        btnAndtf.getChildren().addAll(textField, btn);
+        Pane p = new Pane();
+        // p.setPrefSize(10,10);
+        Rectangle[][] show_rec = new Rectangle[GV.dot_len][GV.dot_len];
+        for (int y = 0; y < GV.dot_len; y++) {
+            for (int x = 0; x < GV.dot_len; x++) {
+                show_rec[y][x] = new Rectangle(10, 10, 10, 10);
                 show_rec[y][x].setFill(rects[y][x].getFill());
-                show_rec[y][x].setX(x*10);
-                show_rec[y][x].setY(y*10);
+                show_rec[y][x].setX(x * 10);
+                show_rec[y][x].setY(y * 10);
                 p.getChildren().add(show_rec[y][x]);
 
             }
         }
-       
 
         vBox.getChildren().add(btnAndtf);
         vBox.getChildren().add(p);
 
-
-        
-
-
-
-
-        Scene scene=new Scene(vBox,200,200);
-        Stage stage=new Stage();
+        Scene scene = new Scene(vBox, 200, 200);
+        Stage stage = new Stage();
         stage.setTitle("コップの命名");
         stage.setScene(scene);
         stage.show();
 
+        btn.setOnMouseClicked(e -> {
+            try {
+                FileWriter file = new FileWriter("./cups.txt", true);
+                PrintWriter pw = new PrintWriter(new BufferedWriter(file));
 
-        btn.setOnMouseClicked(e->{
-            try{
-                FileWriter file=new FileWriter("./cups.txt",true);
-                PrintWriter pw=new PrintWriter(new BufferedWriter(file));
-                pw.print(textField.getText()+" ");
-    
-                for(int y=0;y<dot_len;y++){
-                    for(int x=0;x<dot_len;x++){
-                        pw.print(dots[y][x].name()+",");
+                // 現在時刻取得
+                // 及び表示形式の指定
+                LocalDateTime nowDate = LocalDateTime.now();
+                DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss E曜日");
+                String formatNowDate = dtf.format(nowDate);
+                pw.println("[cup]");
+                pw.println("name=" + textField.getText());
+                pw.println("date=" + formatNowDate);
+                pw.print("data=");
+                String prev = "";
+                int count = 0;
+                for (int y = 0; y < GV.dot_len; y++) {
+                    for (int x = 0; x < GV.dot_len; x++) {
+                        String dot_status = dots[y][x].name();
+                        if (dot_status.equals("EMPTY"))
+                            dot_status = "E";
+                        if (dot_status.equals("WATER"))
+                            dot_status = "W";
+                        if (dot_status.equals("DRAW"))
+                            dot_status = "D";
+
+                        if (prev.equals(""))
+                            prev = dot_status;
+
+                        // 一個前と同じか\\同じでないなら
+                        if (prev.equals(dot_status))
+                            count++;
+                        else {
+                            pw.print(prev + count);
+                            prev = dot_status;
+                            count = 1;
+                        }
 
                     }
+
                 }
-                
+                pw.print(prev + count);
+
+                pw.println();
                 pw.close();
-    
-                
-            }catch(IOException ee){
-                
+
+            } catch (IOException ee) {
+                System.out.println("予期せぬエラーです。");
             }
             stage.close();
         });
     }
 }
 
-class SelectScene extends BaseScene{
+class Cup {
+    /*
+     * name: 名前
+     * date: 作成日時
+     * entity: 実際の形状
+     * drawCup:コップのグラフィックス 
+     */
+    private String name;
+    private String date;
+    private DOT_STATUS[][] entity = new DOT_STATUS[20][20];
+    Rectangle[][] drawCup = new Rectangle[GV.dot_len][GV.dot_len];
 
-    
+    private Pane pane;
+
+    public Cup() {
+        name = "";
+        date = "";
+        pane = new Pane();
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setDate(String date) {
+        this.date = date;
+    }
+
+    public void setEntity(DOT_STATUS[][] entity) {
+        this.entity = entity;
+    }
+
+}
+
+class SelectScene extends BaseScene {
+
+    private ArrayList<Cup> cups = new ArrayList<>();
+
+    public void read() {
+
+        File file = new File("cups.txt");
+        try (BufferedReader br = new BufferedReader(new FileReader((file)))) {
+            String str;
+            while ((str = br.readLine()) != null) {
+
+                if (str.equals("[cup]")) {
+
+                    // カップオブジェクトの作成
+                    Cup cup = new Cup();
+
+                    // 名前の取得
+                    String name = br.readLine();
+                    String date = br.readLine();
+                    cup.setName(name.substring("name=".length()));
+                    cup.setDate(date.substring("date=".length()));
+
+                    // 形状の取得 DWE
+
+                    ArrayList<DOT_STATUS> ary = new ArrayList<>();
+                    while ((str = String.valueOf(br.read())) != null) {
+                        if (str.equals("E"))
+                            for (int i = 0; i < br.read(); i++)
+                                ary.add(DOT_STATUS.EMPTY);
+                        if (str.equals("D"))
+                            for (int i = 0; i < br.read(); i++)
+                                ary.add(DOT_STATUS.DRAW);
+                        if (str.equals("W"))
+                            for (int i = 0; i < br.read(); i++)
+                                ary.add(DOT_STATUS.WATER);
+                    }
+                    DOT_STATUS[][] copy = new DOT_STATUS[GV.dot_len][GV.dot_len];
+                    for (int y = 0; y < GV.dot_len; y++) {
+                        for (int x = 0; x < GV.dot_len; x++) {
+                            copy[y][x] = ary.get(x + y);
+                        }
+                    }
+                    cup.setEntity(copy);
+
+                    cups.add(cup);
+                }
+            }
+        } catch (IOException io) {
+
+        }
+
+    }
+
 }
 
 public class main extends Application {
@@ -505,9 +628,12 @@ public class main extends Application {
                 makeCupScene.setHandler(menuEventHandler);
 
                 baseStage.setScene(makeCupScene.getScene());
+
             }
 
-            if(id.equals("selectCup")){
+            if (id.equals("selectCup")) {
+                SelectScene selectScene = new SelectScene();
+                selectScene.read();
 
             }
         }
@@ -524,5 +650,5 @@ public class main extends Application {
 
     public static void main(String[] args) {
         launch(args);
-    }
+    };
 }
