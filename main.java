@@ -74,6 +74,8 @@ class GV {
     // タイマーの設定
     public static int totalSeconds;// 勉強時間
     public static int breakSeconds;// 休憩時間
+    public static Cup nowCupEntity;
+    public static String SELECTED_CUP;
 
 }
 
@@ -159,10 +161,20 @@ class TimerScene extends BaseScene {
         btnState = BtnState.STOP;
 
         root.getChildren().add(createCupLabel());
+
         root.getChildren().add(createTimerLabel());
+
         root.getChildren().add(createStartButton());
         Init();
 
+    }
+
+    public void draw() {
+        root.getChildren().clear();
+        root.getChildren().add(createTimerLabel());
+
+        root.getChildren().add(drawCup());
+        root.getChildren().add(createStartButton());
     }
 
     // 初期設定
@@ -251,16 +263,22 @@ class TimerScene extends BaseScene {
     }
 
     private Label createCupLabel() {
-        Label cupLabel = new Label("コップ");
+        Label cupLabel = new Label("コップを選択してください");
         cupLabel.setFont(new Font(24));
         cupLabel.setAlignment(Pos.CENTER);
         return cupLabel;
+
     }
 
     private Button createStartButton() {
         timerButton = new Button("START");
         timerButton.setFont(new Font(24));
         return timerButton;
+    }
+
+    private Pane drawCup() {
+        return GV.nowCupEntity.getDrawCup();
+
     }
 
 }
@@ -441,6 +459,7 @@ class MakeCupScene extends BaseScene {
                 LocalDateTime nowDate = LocalDateTime.now();
                 DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss E曜日");
                 String formatNowDate = dtf.format(nowDate);
+
                 pw.println("[cup]");
                 pw.println("name=" + textField.getText());
                 pw.println("date=" + formatNowDate);
@@ -508,8 +527,11 @@ class Cup {
     private Button openButton;
     private BorderPane bP;
 
-    public Cup() {
+    private SelectScene parent;
 
+    public Cup(SelectScene s) {
+
+        parent = s;
         entity = new DOT_STATUS[20][20];
         dots = new Rectangle[GV.dot_len][GV.dot_len];
         pane = new Pane();
@@ -581,6 +603,11 @@ class Cup {
         }
     }
 
+    public Pane getDrawCup() {
+
+        return pane;
+    }
+
     private void initBtn() {
         openButton.setOnMouseClicked(e -> {
 
@@ -594,6 +621,12 @@ class Cup {
 
         deletion.setOnMouseClicked(e -> {
             cupDelete();
+            parent.removeCup(this);
+
+        });
+
+        select.setOnMouseClicked(e -> {
+            selectedCup();
         });
 
     }
@@ -606,9 +639,9 @@ class Cup {
         // cupの削除と
         // 保存データの更新
         File file = new File("cups.txt");
+        ArrayList<String> fileCopy = new ArrayList<>();
 
         try (BufferedReader br = new BufferedReader(new FileReader((file)))) {
-            ArrayList<String> fileCopy = new ArrayList<>();
             String str;
 
             while ((str = br.readLine()) != null) {
@@ -638,15 +671,44 @@ class Cup {
             // TODO: handle exception
         }
 
+        try {
+            FileWriter fileWriter = new FileWriter("./cups.txt", false);
+            PrintWriter pw = new PrintWriter(new BufferedWriter(fileWriter));
+            for (int i = 0; i < fileCopy.size(); i++) {
+                pw.println(fileCopy.get(i));
+
+            }
+            pw.close();
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+
     }
 
+    private void selectedCup() {
+        GV.nowCupEntity = this;
+        parent.setNowCup(this);
+
+    }
+
+    public String getName() {
+        return nameLabel.getText();
+    }
+
+    public Label getNameLabel() {
+        return nameLabel;
+    }
 }
 
 class SelectScene extends BaseScene {
 
     private ArrayList<Cup> cups = new ArrayList<>();
+    private Label selectedCup;
+    private Cup nowCup;
+    private TimerScene timerScene;
 
     public SelectScene() {
+
         read();
 
         for (int i = 0; i < cups.size(); i++)
@@ -664,7 +726,7 @@ class SelectScene extends BaseScene {
                 if (str.equals("[cup]")) {
 
                     // カップオブジェクトの作成
-                    Cup cup = new Cup();
+                    Cup cup = new Cup(this);
 
                     // 名前の取得
                     String name = br.readLine();
@@ -708,6 +770,17 @@ class SelectScene extends BaseScene {
             System.out.println(io.getMessage());
         }
 
+        if (cups.isEmpty()) {
+            NothingCupData();
+        } else {
+            if (nowCup != null)
+                selectedCup = new Label("選択中:" + nowCup.getName());
+            else
+                selectedCup = new Label("選択中:なし");
+            root.getChildren().addFirst(selectedCup);
+
+        }
+
     }
 
     @Override
@@ -715,6 +788,70 @@ class SelectScene extends BaseScene {
         menu.addEventHandler(ActionEvent.ANY, event[0]);
     }
 
+    public void removeCup(Cup cup) {
+        cups.remove(cup);
+        redraw();
+    }
+
+    private void redraw() {
+        root.getChildren().clear();
+
+        if (cups.isEmpty()) {
+            NothingCupData();
+        } else {
+            for (Cup c : cups) {
+                root.getChildren().add(c.getRoot());
+            }
+
+        }
+
+    }
+
+    private void NothingCupData() {
+        Label label = new Label("候補がないです.\nコップを作成してください");
+        root.getChildren().add(label);
+        root.setAlignment(Pos.CENTER);
+
+    }
+
+    public void setNowCup(Cup cup) {
+
+        nowCup = cup;
+        GV.SELECTED_CUP = nowCup.getName();
+        System.out.println(nowCup.getName());
+        selectedCup.setText("選択中:" + nowCup.getName());
+        timerScene.draw();
+
+        File file = new File("cups.txt");
+        ArrayList<String> lines = new ArrayList<>();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(file));
+            String str;
+            while ((str = br.readLine()) != null)
+                lines.add(str);
+        } catch (IOException ioe) {
+            // TODO: handle exception
+            System.out.println(ioe.getMessage());
+        }
+
+        try {
+            FileWriter fileWriter = new FileWriter(file, false);
+            PrintWriter pw = new PrintWriter(new BufferedWriter(fileWriter));
+            lines.set(0, "SELECTED_CUP:" + nowCup.getName());
+            for (String s : lines) {
+                pw.println(s);
+            }
+            pw.close();
+            System.out.println(GV.SELECTED_CUP);
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+
+    }
+
+    public void setTimerScene(TimerScene ts) {
+        this.timerScene = ts;
+    }
 }
 
 public class main extends Application {
@@ -726,6 +863,8 @@ public class main extends Application {
 
     @Override
     public void start(Stage stage) {
+        System.out.println("startは呼び出しているよ");
+        defaultDate();
         myEventHandler = new MenuEventHandler();
         timerEventHandler = new TimerEventHandler();
         timerScene = new TimerScene();
@@ -735,6 +874,32 @@ public class main extends Application {
         baseStage.setScene(timerScene.getScene());
         baseStage.setTitle("タイマー");
         baseStage.show();
+
+    }
+
+    public void defaultDate() {
+        File file = new File("cups.txt");
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(file));
+            PrintWriter bw = new PrintWriter(new FileWriter(file, true));
+            String str;
+            str = br.readLine();
+            if (str == null || !str.contains("SELECTED_CUP")) {
+                bw.println("SELECTED_CUP:default_cup");
+                bw.println("[cup]");
+                bw.println("name=default");
+                bw.println("date=3000");
+                bw.println(
+                        "data=E63D2E7D2E9D2E7D2E9D2W7D5E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D5E6D2W7D2E9D11E9D11E66");
+
+            } else {
+                GV.SELECTED_CUP = str.substring("SELECTED_CUP:".length());
+            }
+            bw.close();
+
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
 
     }
 
@@ -794,6 +959,7 @@ public class main extends Application {
                 SelectScene selectScene = new SelectScene();
                 MenuEventHandler menuEventHandler = new MenuEventHandler();
                 selectScene.setHandler(menuEventHandler);
+                selectScene.setTimerScene(timerScene);
 
                 baseStage.setScene(selectScene.getScene());
 
