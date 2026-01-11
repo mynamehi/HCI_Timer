@@ -2,6 +2,10 @@ import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javafx.application.*;
 import javafx.scene.*;
@@ -91,10 +95,10 @@ class BaseScene {
 
         borderPane = new BorderPane();
         root = new VBox();
+        scene = new Scene(borderPane, GV.sceneW, GV.sceneH);
 
         borderPane.setTop(createMenuBar());
         borderPane.setCenter(root);
-        scene = new Scene(borderPane, GV.sceneW, GV.sceneH);
 
     }
 
@@ -390,7 +394,18 @@ class MakeCupScene extends BaseScene {
 
         VBox vBox = new VBox();
         HBox btnAndtf = new HBox();
-        TextField textField = new TextField();
+        TextField textField = new TextField("");
+
+        TextFormatter<String> formatter = new TextFormatter<>(change -> {
+            if (change.getControlNewText().length() <= 10) {
+                return change;
+            }
+            return null; // 変更を無効化
+        });
+        textField.setTextFormatter(formatter);
+        textField.setPromptText("名前:10文字まで");
+        textField.setFocusTraversable(false);
+
         Button btn = new Button("決定");
         btnAndtf.getChildren().addAll(textField, btn);
         Pane p = new Pane();
@@ -475,31 +490,154 @@ class Cup {
      * name: 名前
      * date: 作成日時
      * entity: 実際の形状
-     * drawCup:コップのグラフィックス 
+     * drawCup:コップのグラフィックス
      */
-    private String name;
-    private String date;
-    private DOT_STATUS[][] entity = new DOT_STATUS[20][20];
-    Rectangle[][] drawCup = new Rectangle[GV.dot_len][GV.dot_len];
-
+    private DOT_STATUS[][] entity;
+    Rectangle[][] dots;
     private Pane pane;
 
+    // その他必要なボタンやUI
+    private HBox root;
+    private VBox labels;
+    private Label nameLabel;
+    private Label dateLabel;
+    // private HBox paneAndBtns;
+    private HBox btns;
+    private Button select;
+    private Button deletion;
+    private Button openButton;
+    private BorderPane bP;
+
     public Cup() {
-        name = "";
-        date = "";
+
+        entity = new DOT_STATUS[20][20];
+        dots = new Rectangle[GV.dot_len][GV.dot_len];
         pane = new Pane();
+        root = new HBox();
+        labels = new VBox();
+        nameLabel = new Label("名無し");
+        dateLabel = new Label("名無し");
+        btns = new HBox(20);
+        select = new Button("選択");
+        deletion = new Button("削除");
+        openButton = new Button("閲覧");
+        initBtn();
+        bP = new BorderPane();
+
+        pane.setMaxSize(50, 50);
+        pane.setPrefSize(300, 300);
+
+        labels.setPadding(new Insets(10));
+
+        btns.getChildren().addAll(openButton, select, deletion);
+        labels.getChildren().addAll(nameLabel, dateLabel);
+        root.getChildren().addAll(labels, btns);
+        root.setMargin(btns, new Insets(10));
+        root.setAlignment(Pos.CENTER);
+
     }
 
     public void setName(String name) {
-        this.name = name;
+        nameLabel.setText(name);
     }
 
     public void setDate(String date) {
-        this.date = date;
+        dateLabel.setText(date);
     }
 
     public void setEntity(DOT_STATUS[][] entity) {
         this.entity = entity;
+
+        for (int y = 0; y < entity.length; y++) {
+            for (int x = 0; x < entity[y].length; x++) {
+                if (this.entity[y][x] == null) {
+                    this.entity[y][x] = DOT_STATUS.EMPTY;
+                }
+            }
+        }
+        if (this.entity == null)
+            System.out.println();
+        drawCup();
+    }
+
+    private void drawCup() {
+        for (int y = 0; y < GV.dot_len; y++) {
+            for (int x = 0; x < GV.dot_len; x++) {
+                Color color = null;
+                if (entity[y][x].equals(DOT_STATUS.DRAW))
+                    color = Color.BLACK;
+                if (entity[y][x].equals(DOT_STATUS.WATER))
+                    color = Color.AQUA;
+                if (entity[y][x].equals(DOT_STATUS.EMPTY))
+                    color = Color.WHITE;
+
+                dots[y][x] = new Rectangle(10, 10, 10, 10);
+                dots[y][x].setFill(color);
+                dots[y][x].setX(x * 10);
+                dots[y][x].setY(y * 10);
+                pane.getChildren().add(dots[y][x]);
+
+            }
+        }
+    }
+
+    private void initBtn() {
+        openButton.setOnMouseClicked(e -> {
+
+            Scene scene = new Scene(pane, 200, 200);
+            Stage stage = new Stage();
+            stage.setTitle("コップ選択");
+            stage.setScene(scene);
+            stage.show();
+
+        });
+
+        deletion.setOnMouseClicked(e -> {
+            cupDelete();
+        });
+
+    }
+
+    public HBox getRoot() {
+        return root;
+    }
+
+    private void cupDelete() {
+        // cupの削除と
+        // 保存データの更新
+        File file = new File("cups.txt");
+
+        try (BufferedReader br = new BufferedReader(new FileReader((file)))) {
+            ArrayList<String> fileCopy = new ArrayList<>();
+            String str;
+
+            while ((str = br.readLine()) != null) {
+                if (str.equals("[cup]")) {
+                    br.mark(20);
+
+                    str = br.readLine();
+                    String name = str.substring("name=".length());
+
+                    if (name.equals(nameLabel.getText())) {
+                        br.reset();
+                        for (int i = 0; i < 3; i++)
+                            br.readLine();
+                        continue;
+                    } else {
+                        fileCopy.add("[cup]");
+
+                    }
+                }
+                fileCopy.add(str);
+
+            }
+            System.out.println(fileCopy);
+            System.out.println();
+
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+
     }
 
 }
@@ -508,9 +646,17 @@ class SelectScene extends BaseScene {
 
     private ArrayList<Cup> cups = new ArrayList<>();
 
+    public SelectScene() {
+        read();
+
+        for (int i = 0; i < cups.size(); i++)
+            root.getChildren().add(cups.get(i).getRoot());
+    }
+
     public void read() {
 
         File file = new File("cups.txt");
+
         try (BufferedReader br = new BufferedReader(new FileReader((file)))) {
             String str;
             while ((str = br.readLine()) != null) {
@@ -529,32 +675,44 @@ class SelectScene extends BaseScene {
                     // 形状の取得 DWE
 
                     ArrayList<DOT_STATUS> ary = new ArrayList<>();
-                    while ((str = String.valueOf(br.read())) != null) {
-                        if (str.equals("E"))
-                            for (int i = 0; i < br.read(); i++)
-                                ary.add(DOT_STATUS.EMPTY);
-                        if (str.equals("D"))
-                            for (int i = 0; i < br.read(); i++)
-                                ary.add(DOT_STATUS.DRAW);
-                        if (str.equals("W"))
-                            for (int i = 0; i < br.read(); i++)
-                                ary.add(DOT_STATUS.WATER);
-                    }
                     DOT_STATUS[][] copy = new DOT_STATUS[GV.dot_len][GV.dot_len];
+                    str = br.readLine();
+                    str = str.substring("data=".length());
+                    String[] splitted = str.split("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)");
+                    System.out.println(Arrays.toString(splitted));
+                    for (int i = 0; i < splitted.length / 2; i++) {
+
+                        if (splitted[i * 2].equals("E"))
+                            for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
+                                ary.add(DOT_STATUS.EMPTY);
+                        if (splitted[i * 2].equals("D"))
+                            for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
+                                ary.add(DOT_STATUS.DRAW);
+                        if (splitted[i * 2].equals("W"))
+                            for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
+                                ary.add(DOT_STATUS.WATER);
+                        System.out.println(splitted[i * 2]);
+                    }
+                    System.out.println(ary.size());
                     for (int y = 0; y < GV.dot_len; y++) {
                         for (int x = 0; x < GV.dot_len; x++) {
-                            copy[y][x] = ary.get(x + y);
+                            copy[y][x] = ary.get(x + y * GV.dot_len);
                         }
                     }
                     cup.setEntity(copy);
-
+                    System.out.println("ok");
                     cups.add(cup);
                 }
             }
         } catch (IOException io) {
-
+            System.out.println(io.getMessage());
         }
 
+    }
+
+    @Override
+    public void setHandler(EventHandler<Event>... event) {
+        menu.addEventHandler(ActionEvent.ANY, event[0]);
     }
 
 }
@@ -632,8 +790,12 @@ public class main extends Application {
             }
 
             if (id.equals("selectCup")) {
+
                 SelectScene selectScene = new SelectScene();
-                selectScene.read();
+                MenuEventHandler menuEventHandler = new MenuEventHandler();
+                selectScene.setHandler(menuEventHandler);
+
+                baseStage.setScene(selectScene.getScene());
 
             }
         }
@@ -650,5 +812,6 @@ public class main extends Application {
 
     public static void main(String[] args) {
         launch(args);
-    };
+
+    }
 }
