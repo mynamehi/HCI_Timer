@@ -68,7 +68,7 @@ class GV {
     public static final int sceneH = 450;
 
     // コップ作成でのドットのサイズと配列の長さ
-    public static final int dot_size = 20;
+    public static final int dot_size = 10;
     public static final int dot_len = 20;
 
     // タイマーの設定
@@ -98,6 +98,7 @@ class BaseScene {
         borderPane = new BorderPane();
         root = new VBox();
         scene = new Scene(borderPane, GV.sceneW, GV.sceneH);
+        scene.setFill(Color.WHITE);
 
         borderPane.setTop(createMenuBar());
         borderPane.setCenter(root);
@@ -143,6 +144,9 @@ class TimerScene extends BaseScene {
 
     // タイマー関連
     private Timeline timeline;
+    private Timeline waterTimeline;
+
+    private Pane pane;
 
     private enum BtnState {
         STOP,
@@ -156,33 +160,55 @@ class TimerScene extends BaseScene {
     public TimerScene() {
 
         GV.totalSeconds = 10;
-        GV.breakSeconds = 5;
+        GV.breakSeconds = 20;
 
         btnState = BtnState.STOP;
+        pane=new Pane();
+
+        pane.setMinSize(GV.dot_len * GV.dot_size, GV.dot_len * GV.dot_size);
 
         root.getChildren().add(createCupLabel());
 
         root.getChildren().add(createTimerLabel());
 
         root.getChildren().add(createStartButton());
+
+        GridPane gridPane=new GridPane();
+        for(int y=0;y<GV.dot_len;y++){
+            for(int x=0;x<GV.dot_len;x++){
+                Rectangle r=new Rectangle(10,10,10,10);
+                r.setFill(Color.AQUA);
+                gridPane.add(r,y,x);
+            }
+        }
+        gridPane.setAlignment(Pos.CENTER);
+        root.getChildren().add(gridPane);
+        
         Init();
 
     }
 
     public void draw() {
         root.getChildren().clear();
-        root.getChildren().add(createTimerLabel());
+        BorderPane bp=new BorderPane();
+        root.getChildren().add(bp);
 
-        root.getChildren().add(drawCup());
-        root.getChildren().add(createStartButton());
+        bp.setTop(createTimerLabel());
+        bp.setCenter(drawCup());
+        bp.setBottom(createStartButton());
+        
+        
+        root.setAlignment(Pos.CENTER);
     }
 
     // 初期設定
     private void Init() {
-        root.setPadding(new Insets(10));
-        root.setAlignment(Pos.CENTER);
+        
         timeline = new Timeline(new KeyFrame(Duration.seconds(1), e -> timerUpdate()));
         timeline.setCycleCount(Timeline.INDEFINITE);
+
+        waterTimeline = new Timeline(new KeyFrame(Duration.millis(50), e -> updateWater()));
+        waterTimeline.setCycleCount(Timeline.INDEFINITE);
 
     }
 
@@ -190,6 +216,7 @@ class TimerScene extends BaseScene {
         btnState = BtnState.STOP;
         timerButton.setText("START");
         timeline.stop();
+        waterTimeline.stop();
 
         System.out.println("Timer stop");
     }
@@ -199,6 +226,7 @@ class TimerScene extends BaseScene {
         btnState = BtnState.START;
         timerButton.setText("STOP");
         timeline.play();
+        waterTimeline.play();
 
         System.out.println("Timer start");
 
@@ -237,11 +265,14 @@ class TimerScene extends BaseScene {
             if (btnState == BtnState.BREAK) {
                 btnState = BtnState.START;
                 timerButton.setDisable(false);
+                time=0;
             } else if (btnState == BtnState.START) {
                 btnState = BtnState.BREAK;
-                timerButton.setDisable(true);
+                timerButton.setDisable(true);//無効か
+                time=0;
             }
             n = 0;
+            time=0;
         }
 
         timerLabel.setText(String.format("%02d:%02d", m, s));
@@ -277,11 +308,165 @@ class TimerScene extends BaseScene {
     }
 
     private Pane drawCup() {
-        return GV.nowCupEntity.getDrawCup();
+        pane = GV.nowCupEntity.getDrawCupPane();
+        prevRec=GV.nowCupEntity.getDot();
+       
+       
+        return pane;
 
     }
 
+    private double time = 0.f;
+   
+    private Rectangle[][] prevRec;//前の状態を管理する。
+
+    private void updateWater() {
+
+        if(btnState == BtnState.START)downWater();
+        if(btnState==BtnState.BREAK)upWater();
+
+    }
+       
+
+    private void upWater()
+    {
+        time += 0.05f;
+    pane.getChildren().clear();
+
+    if (GV.nowCupEntity == null) return;
+
+    // 1. 水の範囲を特定 (ここは変更なし)
+    int maxY = 0;
+    int minY = GV.dot_len;
+    for (int y = 0; y < GV.dot_len; y++) {
+        for (int x = 0; x < GV.dot_len; x++) {
+            if (GV.nowCupEntity.getEntity()[y][x] == DOT_STATUS.WATER) {
+                if (maxY < y) maxY = y;
+                if (y < minY) minY = y;
+            }
+        }
+    }
+
+    int waterYArea = maxY - minY + 1;
+    double oneYAreaChangeTime = GV.breakSeconds / (double) waterYArea;
+    
+    // 現在どの行(y)を処理しているか
+    int nowY = (int) (maxY - time / oneYAreaChangeTime);
+    // その行が「何パーセント」満たされているか (0.0 ~ 1.0)
+    double rowProgress = (time / oneYAreaChangeTime) - (maxY - nowY);
+
+    for (int y = 0; y < GV.dot_len; y++) {
+        for (int x = 0; x < GV.dot_len; x++) {
+            Rectangle rec = new Rectangle(x * GV.dot_size, y * GV.dot_size, GV.dot_size, GV.dot_size);
+            Color col = Color.WHITE;
+            DOT_STATUS dot = GV.nowCupEntity.getEntity()[y][x];
+
+            if (dot == DOT_STATUS.WATER) {
+                if (y > nowY) {
+                    // すでに満たされた下の行
+                    col = Color.AQUA;
+                } else if (y == nowY) {
+                    // ★修正のキモ：今増えている行
+                    col = Color.AQUA;
+                    double currentHeight = GV.dot_size * rowProgress;
+                    if (currentHeight > GV.dot_size) currentHeight = GV.dot_size; // 限界突破防止
+                    
+                    // Y座標を「マスの底」から「高さ分」引いた位置にする
+                    rec.setY((y * GV.dot_size) + (GV.dot_size - currentHeight));
+                    rec.setHeight(currentHeight);
+                } else {
+                    // まだ水が到達していない上の行
+                    col = Color.WHITE;
+                }
+            } else if (dot == DOT_STATUS.DRAW) {
+                col = Color.BLACK;
+            }
+
+            rec.setFill(col);
+            pane.getChildren().add(rec);
+            // prevRec[y][x] = rec; // 足し算を使わないなら、これに依存しなくてOK
+        }
+    }
+
+    }
+    
+    private void downWater(){
+        time+=0.05f;
+        pane.getChildren().clear();
+        
+
+        if(GV.nowCupEntity==null)return;
+
+        int maxY=0;
+        int minY=GV.dot_len;
+        
+        for(int y=0;y<GV.dot_len;y++){
+            for(int x=0;x<GV.dot_len;x++){
+                if(GV.nowCupEntity.getEntity()[y][x]==DOT_STATUS.WATER){
+                    if(maxY<y)maxY=y;
+                    if(y<minY)minY=y;
+                }
+            }
+        }
+
+        int waterYArea=maxY-minY+1;
+        double oneYAreaChangeTime=GV.totalSeconds/(double)waterYArea;
+        double changeValue=GV.dot_size/oneYAreaChangeTime;
+        int nowY=(int)(minY+time/oneYAreaChangeTime);
+        if(maxY<nowY)nowY=maxY;
+        
+
+        for(int y=0;y<GV.dot_len;y++){
+            for(int x=0;x<GV.dot_len;x++){
+                //更新するy軸の配列か
+                Rectangle rec=new Rectangle();
+                Color col=Color.WHITE;
+                if(nowY==y &&GV.nowCupEntity.getEntity()[y][x]==DOT_STATUS.WATER){
+                    double h=prevRec[y][x].getHeight();
+                    if(h<=0)h=0;
+                    rec=new Rectangle(
+                         x*GV.dot_size,
+                        y*GV.dot_size,
+                        GV.dot_size,
+                        GV.dot_size-h
+                    );
+                    rec.setFill(col);
+                    pane.getChildren().add(rec);
+                    
+                    rec=new Rectangle(
+                        x*GV.dot_size,
+                        prevRec[y][x].getY()+changeValue,
+                        GV.dot_size,
+                        prevRec[y][x].getHeight()-changeValue
+                    );
+                    
+                    col=Color.AQUA;
+                }
+                else
+                {
+                    rec=new Rectangle(x*GV.dot_size,y*GV.dot_size,GV.dot_size,GV.dot_size);
+                    DOT_STATUS dot=GV.nowCupEntity.getEntity()[y][x];
+                    if(dot==DOT_STATUS.DRAW)col=Color.BLACK;
+                    if(dot==DOT_STATUS.EMPTY)col=Color.WHITE;
+                    if(dot==DOT_STATUS.WATER&& nowY<y)col=Color.AQUA;
+                    
+                }
+                rec.setFill(col);
+
+                pane.getChildren().add(rec);
+                prevRec[y][x]=rec;
+
+                
+            }
+        }
+        
+
+    }
+    
+
 }
+
+
 
 class SettingScene extends BaseScene {
     private Label labelSetting;
@@ -559,12 +744,20 @@ class Cup {
 
     }
 
+    public Rectangle[][] getDot() {
+        return dots;
+    }
+
     public void setName(String name) {
         nameLabel.setText(name);
     }
 
     public void setDate(String date) {
         dateLabel.setText(date);
+    }
+
+    public DOT_STATUS[][] getEntity() {
+        return entity;
     }
 
     public void setEntity(DOT_STATUS[][] entity) {
@@ -603,9 +796,28 @@ class Cup {
         }
     }
 
-    public Pane getDrawCup() {
+    public Pane getDrawCupPane() {
 
         return pane;
+    }
+
+    public void updateDraw() {
+        pane.getChildren().clear();
+        for (int y = 0; y < GV.dot_len; y++) {
+            for (int x = 0; x < GV.dot_len; x++) {
+                Color color = null;
+                if (entity[y][x].equals(DOT_STATUS.DRAW))
+                    color = Color.BLACK;
+                if (entity[y][x].equals(DOT_STATUS.WATER))
+                    color = Color.AQUA;
+                if (entity[y][x].equals(DOT_STATUS.EMPTY))
+                    color = Color.WHITE;
+
+                dots[y][x].setFill(color);
+                pane.getChildren().add(dots[y][x]);
+
+            }
+        }
     }
 
     private void initBtn() {
