@@ -31,6 +31,108 @@ import javafx.animation.*;
 //グローバル変数
 class GV {
 
+    public static void getDefultCupNmae() {
+    // ファイルの読み込み
+    File file = new File("cups.txt");
+
+    try {
+        // ファイルが読み込み可能でない場合、作成する
+        if (!file.canRead()) {
+            file.createNewFile();
+        }
+    } catch (Exception e) {
+        System.out.println("ファイルの作成に失敗しました: " + e.getMessage());
+        return;
+    }
+
+    String str = null; // 読み込んだ内容を格納するためにnullで初期化
+    try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+        // ファイルの1行目を読み込み
+        str = br.readLine();
+        System.out.println(str == null); // nullである場合、デフォルト値を設定する
+
+    } catch (IOException io) {
+        System.out.println("ファイル読み込みエラー: " + io.getMessage());
+    }
+
+    // strがnullの場合は、ファイルにデフォルト情報を追加
+    if (str == null) {
+        try (PrintWriter bw = new PrintWriter(new FileWriter(file, true))) {
+            bw.println("SELECTED_CUP:default");
+            bw.println("[cup]");
+            bw.println("name=default");
+            bw.println("date=9999/99/99 99:99:99 ●曜日");
+            bw.println("data=E63D2E7D2E9D2E7D2E9D2W7D5E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D5E6D2W7D2E9D11E9D11E66");
+        } catch (IOException e) {
+            System.out.println("ファイルへの書き込みエラー: " + e.getMessage());
+        }
+    } else {
+        // 既存のSELECTED_CUPの名前を取得
+        if (str.contains("SELECTED_CUP")) {
+            GV.SELECTED_CUP = str.substring("SELECTED_CUP:".length());
+            System.out.println("選択されたカップ名: " + GV.SELECTED_CUP);
+        }
+    }
+
+    // ファイルの内容を再度読み込んで、カップ情報を取り出す
+    try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+        String line;
+        while ((line = br.readLine()) != null) {
+            if (line.equals("[cup]")) {
+                // カップオブジェクトの作成
+                Cup cup = new Cup();
+                // 名前と日付を取得
+                String name = br.readLine();
+                String date = br.readLine();
+
+                // コップの名前と日付をセット
+                cup.setName(name.substring("name=".length()));
+                cup.setDate(date.substring("date=".length()));
+
+                // ドット情報を取得
+                ArrayList<DOT_STATUS> ary = new ArrayList<>();
+                DOT_STATUS[][] copy = new DOT_STATUS[GV.dot_len][GV.dot_len];
+
+                // データ行の取得と正規化
+                String dataLine = br.readLine();
+                dataLine = dataLine.substring("data=".length());
+
+                // RLE(ランレングス圧縮)の解凍
+                String[] splitted = dataLine.split("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)");
+                for (int i = 0; i < splitted.length / 2; i++) {
+                    if (splitted[i * 2].equals("E"))
+                        for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
+                            ary.add(DOT_STATUS.EMPTY);
+                    if (splitted[i * 2].equals("D"))
+                        for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
+                            ary.add(DOT_STATUS.DRAW);
+                    if (splitted[i * 2].equals("W"))
+                        for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
+                            ary.add(DOT_STATUS.WATER);
+                }
+
+                // 一次元配列を二次元に変換
+                for (int y = 0; y < GV.dot_len; y++) {
+                    for (int x = 0; x < GV.dot_len; x++) {
+                        copy[y][x] = ary.get(x + y * GV.dot_len);
+                    }
+                }
+
+                // カップのエンティティを設定
+                cup.setEntity(copy);
+
+                // 選択されたカップの設定
+                if (cup.getName().equals(GV.SELECTED_CUP)) {
+                    GV.nowCupEntity = cup;
+                    System.out.println("選択されたカップのエンティティがセットされました。");
+                }
+            }
+        }
+    } catch (IOException io) {
+        System.out.println("ファイル読み込みエラー: " + io.getMessage());
+    }
+}
+
     // 全シーン共通のサイズ
     public static final int sceneW = 420;
     public static final int sceneH = 470;
@@ -43,8 +145,8 @@ class GV {
     public static final int dot_len = 20;
 
     // タイマーの設定
-    public static final int totalSeconds = 25 * 60;// 勉強時間
-    public static final int breakSeconds = 5 * 60;// 休憩時間
+    public static final int totalSeconds = 5;// 勉強時間
+    public static final int breakSeconds = 5;// 休憩時間
     public static Cup nowCupEntity;
     public static String SELECTED_CUP;
 
@@ -120,7 +222,7 @@ class BaseScene {
         mb = new MenuBar();
         menu = new Menu("設定");
         mi = new MenuItem("ホーム");
-        mi1 = new MenuItem("タイマー設定");
+        mi1 = new MenuItem("アプリ概要");
         mi2 = new MenuItem("コップ作成");
         mi3 = new MenuItem("コップ選択");
         mi4 = new MenuItem("終了");
@@ -131,7 +233,7 @@ class BaseScene {
         mi3.setId("selectCup");
         mi4.setId("exit");
 
-        menu.getItems().addAll(mi, mi1, mi2, mi3, mi4);
+        menu.getItems().addAll(mi, mi1,  mi2, mi3, mi4);
         mb.getMenus().addAll(menu);
         return mb;
     }
@@ -148,8 +250,10 @@ class TimerScene extends BaseScene {
     private Timeline timeline;
     private Timeline waterTimeline;
 
+    // コップで表示するため
     private GridPane gridPane;
 
+    // ボタンの状態一覧
     private enum BtnState {
         STOP,
         START,
@@ -157,92 +261,38 @@ class TimerScene extends BaseScene {
         RESET
     }
 
+    // ボタン状態保持
     BtnState btnState;
 
     public TimerScene() {
-        defaultDate();
 
+        // ストップで設定
         btnState = BtnState.STOP;
+
         gridPane = new GridPane();
+
+        // デフォルトが読み込めている
         if (GV.nowCupEntity != null)
             draw();
-        else
+        else {
             root.getChildren().add(createCupLabel());
-        root.getChildren().add(createTimerLabel());
-        root.getChildren().add(createStartButton());
+            root.getChildren().add(createTimerLabel());
+            root.getChildren().add(createStartButton());
+        }
 
         // タイマー部分
+        // 一秒ごとに更新
         timeline = new Timeline(new KeyFrame(Duration.seconds(1), e -> timerUpdate()));
         timeline.setCycleCount(Timeline.INDEFINITE);
 
         // アニメーション部分
+        // 0.05秒に更新
         waterTimeline = new Timeline(new KeyFrame(Duration.millis(50), e -> updateWater()));
         waterTimeline.setCycleCount(Timeline.INDEFINITE);
 
     }
 
-    public void defaultDate() {
-        File file = new File("cups.txt");
-        try {
-            BufferedReader br = new BufferedReader(new FileReader(file));
-            PrintWriter bw = new PrintWriter(new FileWriter(file, true));
-            String str;
-            str = br.readLine();
-            if (str == null || !str.contains("SELECTED_CUP")) {
-                bw.println("SELECTED_CUP:default_cup");
-                bw.println("[cup]");
-                bw.println("name=default");
-                bw.println("date=9999/99/99 99:99:99 ●曜日");
-                bw.println(
-                        "data=E63D2E7D2E9D2E7D2E9D2W7D5E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D2E1D2E6D2W7D5E6D2W7D2E9D11E9D11E66");
-
-            } else {
-                GV.SELECTED_CUP = str.substring("SELECTED_CUP:".length());
-            }
-
-            // strがある=defaultがある
-            while ((str = br.readLine()) != null) {
-
-                if (GV.SELECTED_CUP == str.substring("name=".length())) {
-                    br.readLine();
-                    String data = br.readLine();
-                    break;
-                }
-            }
-            String[] splitted = str.split("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)");
-            ArrayList<DOT_STATUS> ary = new ArrayList<>();
-            DOT_STATUS[][] copy = new DOT_STATUS[GV.dot_len][GV.dot_len];
-            for (int i = 0; i < splitted.length / 2; i++) {
-
-                if (splitted[i * 2].equals("E"))
-                    for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
-                        ary.add(DOT_STATUS.EMPTY);
-                if (splitted[i * 2].equals("D"))
-                    for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
-                        ary.add(DOT_STATUS.DRAW);
-                if (splitted[i * 2].equals("W"))
-                    for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
-                        ary.add(DOT_STATUS.WATER);
-                System.out.println(splitted[i * 2]);
-            }
-            System.out.println(ary.size());
-            for (int y = 0; y < GV.dot_len; y++) {
-                for (int x = 0; x < GV.dot_len; x++) {
-                    copy[y][x] = ary.get(x + y * GV.dot_len);
-                }
-            }
-            Cup cup=new Cup(new SelectScene());
-            cup.setDot_status(copy);
-            GV.nowCupEntity=cup;
-
-            bw.close();
-
-        } catch (Exception e) {
-            // TODO: handle exception
-        }
-
-    }
-
+    // ストップ
     private void timerStop() {
         btnState = BtnState.STOP;
         timerButton.setText("START");
@@ -265,6 +315,7 @@ class TimerScene extends BaseScene {
 
     private int n = 0;
 
+    // タイマーのアップデートと休憩と勉強の切り替え
     private void timerUpdate() {
         int hoge = 0;
 
@@ -318,7 +369,9 @@ class TimerScene extends BaseScene {
         return timerButton;
     }
 
+    // いま選択されているcupをgridPaneに描写する
     private void drawCup() {
+
         GridPane gp = new GridPane();
 
         for (int y = 0; y < GV.dot_len; y++) {
@@ -447,9 +500,9 @@ class TimerScene extends BaseScene {
                     if (h <= 0)
                         h = 0;
 
-                    rec.setY(rec.getY() + changeValue);
-
-                    rec.setHeight(rec.getHeight() - changeValue);
+                    rec.setHeight(0);
+                    // rec.setY(y*GV.timerScene_dot_size);
+                    rec.setWidth(GV.timerScene_dot_size);
 
                 }
 
@@ -462,9 +515,12 @@ class TimerScene extends BaseScene {
 
     public void draw() {
         drawCup();
+
+        // UIのクリアとポジションをcenterに
         root.getChildren().clear();
         root.setAlignment(Pos.CENTER);
 
+        // タイマー、コップ、ボタンの順に設置
         root.getChildren().add(createTimerLabel());
         root.getChildren().add(gridPane);
         gridPane.setAlignment(Pos.CENTER);
@@ -494,28 +550,40 @@ class TimerScene extends BaseScene {
     }
 
 }
+//説明
+class ExpScene extends BaseScene {
+        private Label label_exp;
+    private Label labelInfo;
 
-class SettingScene extends BaseScene {
-    private Label labelSetting;
-    private Label labelColor;
-    private ColorPicker colorPicker;
+    public ExpScene() {
 
-    public SettingScene() {
+        // アプリの概要説明ラベル
+        label_exp = new Label("このアプリケーションは、あなたの操作に応じてカップを選択し、カスタマイズするゲームアプリです。\n" +
+                              "コップを選び、そのデータに基づいてゲームを進めていきます。");
 
-        labelSetting = new Label("設定画面");
-        labelColor = new Label("色設定");
-        colorPicker = new ColorPicker();
-        colorPicker.getStyleClass().add(ColorPicker.STYLE_CLASS_BUTTON);
-        colorPicker.setValue(Color.CORAL);
+        // 詳細な操作説明ラベル
+        labelInfo = new Label("1. コップの選択: 「コップ選択画面」から好きなコップを選びます。\n" +
+                              "2. カスタマイズ: それぞれのコップにはカスタムデータ（色、サイズなど）が設定されています。\n" +
+                              "3. ゲーム開始: コップを選択した後、ゲームが開始されます。");
 
-        root.getChildren().addAll(labelSetting, labelColor);
-        root.getChildren().add(colorPicker);
+        // レイアウトにラベルを追加
+        root.getChildren().addAll(label_exp, labelInfo);
 
+        // 各ラベルの位置設定
+        label_exp.setLayoutX(50);  // 位置をX座標50に設定
+        label_exp.setLayoutY(30);  // 位置をY座標30に設定
+
+        labelInfo.setLayoutX(50);  // 位置をX座標50に設定
+        labelInfo.setLayoutY(100); // 位置をY座標100に設定
+
+        // フォントサイズやスタイルを変更して視覚的に強調することもできます
+        label_exp.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        labelInfo.setStyle("-fx-font-size: 14px;");
     }
 
     @Override
     public void setHandler(EventHandler<Event>... handler) {
-        colorPicker.addEventHandler(ActionEvent.ANY, handler[0]);
+        
         this.menu.addEventHandler(ActionEvent.ANY, handler[1]);
     }
 
@@ -783,8 +851,34 @@ class Cup {
         root.setAlignment(Pos.CENTER);
 
     }
-    public void setDot_status(DOT_STATUS[][] ds){
-        entity=ds;
+    public Cup() {
+
+        
+        entity = new DOT_STATUS[20][20];
+        dots = new Rectangle[GV.dot_len][GV.dot_len];
+        gridPane = new GridPane();
+        root = new HBox();
+        labels = new VBox();
+        nameLabel = new Label("名無し");
+        dateLabel = new Label("名無し");
+        btns = new HBox(20);
+        select = new Button("選択");
+        deletion = new Button("削除");
+        openButton = new Button("閲覧");
+        initBtn();
+
+        labels.setPadding(new Insets(10));
+
+        btns.getChildren().addAll(openButton, select, deletion);
+        labels.getChildren().addAll(nameLabel, dateLabel);
+        root.getChildren().addAll(labels, btns);
+        root.setMargin(btns, new Insets(10));
+        root.setAlignment(Pos.CENTER);
+
+    }
+
+    public void setDot_status(DOT_STATUS[][] ds) {
+        entity = ds;
         setEntity(ds);
     }
 
@@ -961,61 +1055,86 @@ class Cup {
 
 class SelectScene extends BaseScene {
 
+    /*
+     * cups: コップ管理list
+     * selectedCup: 選ばれているコップを表示するためのLabel
+     * nowCup: 選ばれているコップの情報を格納
+     * timerScene: タイマーシーン
+     * scrollPane: スクロールのために使用
+     * cupContainer:スクロールの子でこの中にコップを追加
+     */
     private ArrayList<Cup> cups = new ArrayList<>();
     private Label selectedCup;
     private Cup nowCup;
     private TimerScene timerScene;
     private ScrollPane scrollPane;
-    private VBox cupContainer; // 10は間隔
+    private VBox cupContainer;
 
     public SelectScene() {
 
-        read();
+        saveFileRead();
+
         cupContainer = new VBox(10);
+
         scrollPane = new ScrollPane();
         scrollPane.setFitToWidth(true);
         scrollPane.setFitToHeight(false);
-        scrollPane.setContent(cupContainer);
-        root.getChildren().add(scrollPane);
+        scrollPane.setContent(cupContainer);// スクロール表示する子
 
+        root.getChildren().add(scrollPane);// 親直下に配置
+
+        // コップ周辺のＵＩの設置
         for (int i = 0; i < cups.size(); i++)
             cupContainer.getChildren().add(cups.get(i).getRoot());
 
-        for(Cup c:cups){
-            if(GV.SELECTED_CUP==c.getName()){
-                GV.nowCupEntity=c;
+        // コップの中に選択中のコップがあるならグローバルに設置
+        for (Cup c : cups) {
+            if (GV.SELECTED_CUP == c.getName()) {
+                GV.nowCupEntity = c;
             }
         }
-        
+
     }
 
-    private void read() {
-
+    // 保存ファイルを読み込みデータにあるコップの情報をCupごとにインスト＆選択中の表示
+    public void saveFileRead() {
+        // ファイルの指定
         File file = new File("cups.txt");
 
+        // ファイルの読み込み
         try (BufferedReader br = new BufferedReader(new FileReader((file)))) {
+
+            // 一行分を読み込み保存するため
             String str;
+
+            // 一行ずつ最後まで読み込む
             while ((str = br.readLine()) != null) {
 
+                // カップ情報の文頭か
                 if (str.equals("[cup]")) {
 
                     // カップオブジェクトの作成
                     Cup cup = new Cup(this);
 
-                    // 名前の取得
+                    // 名前と日付、取得
                     String name = br.readLine();
                     String date = br.readLine();
+
+                    // コップの名前と日付をセット
                     cup.setName(name.substring("name=".length()));
                     cup.setDate(date.substring("date=".length()));
 
-                    // 形状の取得 DWE
-
+                    // ドット情報をとりあえず一次元で取得
                     ArrayList<DOT_STATUS> ary = new ArrayList<>();
+                    // ドット情報を２次元にして扱いやすいようにするため
                     DOT_STATUS[][] copy = new DOT_STATUS[GV.dot_len][GV.dot_len];
+
+                    // データ行の取得と正規化
                     str = br.readLine();
                     str = str.substring("data=".length());
+
+                    // RLE(ランレングス圧縮)を解凍する
                     String[] splitted = str.split("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)");
-                    System.out.println(Arrays.toString(splitted));
                     for (int i = 0; i < splitted.length / 2; i++) {
 
                         if (splitted[i * 2].equals("E"))
@@ -1027,31 +1146,60 @@ class SelectScene extends BaseScene {
                         if (splitted[i * 2].equals("W"))
                             for (int j = 0; j < Integer.parseInt(splitted[i * 2 + 1]); j++)
                                 ary.add(DOT_STATUS.WATER);
-                        System.out.println(splitted[i * 2]);
                     }
-                    System.out.println(ary.size());
+
+                    // １次元を二次元配列に移動
                     for (int y = 0; y < GV.dot_len; y++) {
                         for (int x = 0; x < GV.dot_len; x++) {
                             copy[y][x] = ary.get(x + y * GV.dot_len);
                         }
                     }
+
+                    // 実態をCupにセット
                     cup.setEntity(copy);
-                    System.out.println("ok");
+
+                    // 配列にadd
                     cups.add(cup);
+
+                    if (cup.getName().equals(GV.SELECTED_CUP)) {
+                        GV.nowCupEntity = cup;
+
+                    }
                 }
             }
+
         } catch (IOException io) {
             System.out.println(io.getMessage());
         }
 
+        // コップがひとつもない
+      if (GV.SELECTED_CUP != null) {
+    // すでにラベルが存在すればそのまま、なければ新規作成
+    selectedCup = (selectedCup == null ? new Label("選択中:" + GV.SELECTED_CUP) : selectedCup);
+    // ラベルが既に存在する場合、テキストを最新に更新する処理を入れるとより安全です
+    selectedCup.setText("選択中:" + GV.SELECTED_CUP);
+} else {
+    // 選択されていない場合の表示
+    if (selectedCup == null) {
+        selectedCup = new Label("選択されていません");
+    } else {
+        selectedCup.setText("選択されていません");
+    }
+}
+
+    }
+
+    public void redraw() {
+        cupContainer.getChildren().clear();
+
         if (cups.isEmpty()) {
+            // 候補がないことを伝えるUI設置
             NothingCupData();
         } else {
-            if (GV.SELECTED_CUP != null)
-                selectedCup = new Label("選択中:" + GV.SELECTED_CUP);
-            else
-                selectedCup = new Label("選択中:なし");
-            root.getChildren().addFirst(selectedCup);
+            // スクロールの子のBoxにコップを配置
+            for (Cup c : cups) {
+                cupContainer.getChildren().add(c.getRoot());
+            }
 
         }
 
@@ -1065,20 +1213,6 @@ class SelectScene extends BaseScene {
     public void removeCup(Cup cup) {
         cups.remove(cup);
         redraw();
-    }
-
-    private void redraw() {
-        cupContainer.getChildren().clear();
-
-        if (cups.isEmpty()) {
-            NothingCupData();
-        } else {
-            for (Cup c : cups) {
-                cupContainer.getChildren().add(c.getRoot());
-            }
-
-        }
-
     }
 
     private void NothingCupData() {
@@ -1130,6 +1264,13 @@ class SelectScene extends BaseScene {
 
 public class main extends Application {
 
+    /*
+     * stgae: シーン遷移のため
+     * myEventHandler: 全シーンに共通しているから
+     * timerEventHandler :
+     * timerScene: タイマーシーン
+     * selectScene: セレクトシーン
+     */
     Stage baseStage;
     MenuEventHandler myEventHandler;
     TimerEventHandler timerEventHandler;
@@ -1138,12 +1279,16 @@ public class main extends Application {
 
     @Override
     public void start(Stage stage) {
-        
 
-        selectScene = new SelectScene();
+        GV.getDefultCupNmae();
+
         
+        // メニューバーのイベントハンドラ
         myEventHandler = new MenuEventHandler();
+
+        // タイマーのイベントハンドラ
         timerEventHandler = new TimerEventHandler();
+        // タイマーシーンのインスタンス化
         timerScene = new TimerScene();
 
         timerScene.setHandler(myEventHandler, timerEventHandler);
@@ -1152,9 +1297,9 @@ public class main extends Application {
         baseStage.setTitle("タイマー");
         baseStage.show();
 
-    }
+        System.out.println(GV.SELECTED_CUP);
 
-    
+    }
 
     // タイマーの操作系
     private class TimerEventHandler implements EventHandler<Event> {
@@ -1167,7 +1312,6 @@ public class main extends Application {
 
             }
             timerScene.timerStateChange();
-            System.out.println("押しているよ");
 
         }
     }
@@ -1188,7 +1332,7 @@ public class main extends Application {
                 Platform.exit();
             }
             if (id.equals("setting")) {
-                SettingScene settingScene = new SettingScene();
+                ExpScene settingScene = new ExpScene();
                 SettingEventHandler settingEventHandler = new SettingEventHandler();
                 MenuEventHandler menuEventHandler = new MenuEventHandler();
 
@@ -1208,11 +1352,15 @@ public class main extends Application {
             }
 
             if (id.equals("selectCup")) {
+                // ファイル読み込みが必要
+        selectScene = new SelectScene();
 
-                
+
                 MenuEventHandler menuEventHandler = new MenuEventHandler();
                 selectScene.setHandler(menuEventHandler);
                 selectScene.setTimerScene(timerScene);
+            
+                System.out.println("ファイル再読み込み");
 
                 baseStage.setScene(selectScene.getScene());
 
